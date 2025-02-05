@@ -34,7 +34,7 @@ def parse_arguments():
                         help="Type of model to use: 'mlp' for a fully-connected network or 'cnn' for a convolutional network.")
     parser.add_argument('--data_folder', type=str, default='data',
                         help='Folder with the cifar-10-batches-py files.')
-    parser.add_argument('--epsilon', type=float, default=0.01,
+    parser.add_argument('--epsilon', type=float, default=0.1,
                         help='FGSM perturbation magnitude (default: 0.1). For Gaussian noise this is the standard deviation.')
     return parser.parse_args()
 

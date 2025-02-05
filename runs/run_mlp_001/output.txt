@@ -1,0 +1,18 @@
+Arguments:
+  experiment_folder: runs/run_mlp_001
+  data_folder: data
+  model_type: mlp
+  batch_size: 100
+  epsilon: 0.01
+
+
+Using MLP model.
+Loaded model from runs/run_mlp_001/best_model.pth
+Clean Test Accuracy: 51.54%
+FGSM Adversarial Test Accuracy (epsilon = 0.01): 27.17%
+Gaussian Adversarial Test Accuracy (epsilon = 0.01): 51.53%
+
+Evaluation Summary:
+Clean Test Accuracy: 51.54%
+FGSM Adversarial Test Accuracy: 27.17%
+Gaussian Adversarial Test Accuracy: 51.53%

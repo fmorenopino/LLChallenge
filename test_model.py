@@ -22,14 +22,14 @@ if torch.cuda.is_available():
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Evaluate a trained CIFAR-10 model using adversarial attacks.")
-    parser.add_argument('--experiment_folder', type=str, default="runs/run_cifar_cnn", 
+    parser.add_argument('--experiment_folder', type=str, default="runs/run_mlp_001", 
                         help="Path to the experiment folder that contains the best_model.pth and testing subfolder.")
     parser.add_argument('--data_folder', type=str, default='data',
                         help="Folder with the cifar-10-batches-py files.")
-    parser.add_argument('--model_type', type=str, default="cnn", choices=["mlp", "cnn"],
+    parser.add_argument('--model_type', type=str, default="mlp", choices=["mlp", "cnn"],
                         help="Type of model to use: 'mlp' for a fully-connected network or 'cnn' for a convolutional network.")
     parser.add_argument('--batch_size', type=int, default=100, help="Batch size for evaluation.")
-    parser.add_argument('--epsilon', type=float, default=0.1,
+    parser.add_argument('--epsilon', type=float, default=0.01,
                         help="FGSM perturbation magnitude (for Gaussian noise, this is the standard deviation).")
     return parser.parse_args()
 
@@ -263,6 +263,42 @@ def test_adversarial(model, x_test, y_test, batch_size, epsilon, device, testing
                           f"Original vs {attack_name} Adversarial Examples (epsilon = {epsilon})", save_path)
     return adv_accuracy, avg_loss
 
+
+
+def load_cifar_batch(filename):
+    with open(filename, 'rb') as f:
+        batch = pickle.load(f, encoding='latin1')
+    data = batch['data']  # shape: (10000, 3072)
+    labels = batch['labels']  # list of 10000 labels
+    data = data.reshape(-1, 3, 32, 32)
+    return data, labels
+
+
+def load_cifar10(data_folder):
+    train_data = []
+    train_labels = []
+    for i in range(1, 6):
+        batch_name = f"cifar_data_batch_{i}"
+        batch_path = os.path.join(data_folder, batch_name)
+        data, labels = load_cifar_batch(batch_path)
+        train_data.append(data)
+        train_labels.extend(labels)
+    x_train = np.concatenate(train_data, axis=0)
+    y_train = np.array(train_labels)
+
+    test_path = os.path.join(data_folder, "cifar_test_batch")
+    x_test, y_test = load_cifar_batch(test_path)
+    y_test = np.array(y_test)
+    
+    return x_train, y_train, x_test, y_test
+
+
+def preprocess_cifar_images(x):
+    """
+    Normalize CIFAR-10 images to [0, 1] and cast to float32.
+    """
+    x = x / 255.0
+    return x.astype(np.float32)
 
 def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
