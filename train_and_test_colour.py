@@ -30,11 +30,11 @@ def parse_arguments():
     parser.add_argument('--plot_freq', type=int, default=5, help='Frequency (in epochs) to plot validation predictions.')
     parser.add_argument('--lr', type=float, default=0.1, help='Learning rate for the optimiser.')
     parser.add_argument('--hidden_units', type=int, default=100, help='Number of hidden units in the MLP model.')
-    parser.add_argument('--model_type', type=str, default="cnn", choices=["mlp", "cnn"],
+    parser.add_argument('--model_type', type=str, default="mlp", choices=["mlp", "cnn"],
                         help="Type of model to use: 'mlp' for a fully-connected network or 'cnn' for a convolutional network.")
     parser.add_argument('--data_folder', type=str, default='data',
                         help='Folder with the cifar-10-batches-py files.')
-    parser.add_argument('--epsilon', type=float, default=0.1,
+    parser.add_argument('--epsilon', type=float, default=0.01,
                         help='FGSM perturbation magnitude (default: 0.1). For Gaussian noise this is the standard deviation.')
     return parser.parse_args()
 
