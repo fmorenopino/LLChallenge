@@ -1,5 +1,6 @@
 #User defined
 /runs/run_2*
+event*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
