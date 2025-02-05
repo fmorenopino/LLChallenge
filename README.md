@@ -1,8 +1,8 @@
 # Adversarial Robustness
 
-This repository contains code for training and evaluating neural network models on the MNIST and CIFAR datasets with a particular focus on adversarial robustness. The repository provides two main scripts:
+This repository contains code for training and evaluating neural network models on the CIFAR dataset with a particular focus on adversarial robustness. The repository provides two main scripts:
 
-- **train_and_test.py** – Trains a model on MNIST or CIFAR data, evaluates it on both clean and adversarial examples, and saves metrics and plots.
+- **train_and_test.py** – Trains a model on CIFAR data, evaluates it on both clean and adversarial examples, and saves metrics and plots.
 - **test_model.py** – Loads a pre-trained model and evaluates it on the test set, including adversarial evaluation using two different corruption techniques.
 
 ---
@@ -24,7 +24,7 @@ The code in this repository is designed to demonstrate how input images can be c
 
 ### train_and_test.py
 
-This script is responsible for both training and testing a model on MNIST/CIFAR data. Its key functions include:
+This script is responsible for both training and testing a model on CIFAR data. Its key functions include:
 
 - **Data Loading and Preprocessing:**  
   Loads the corresponding dataset from and partitions the training data into training and validation sets. A fixed subset of test and validation data is selected for visualisation.
