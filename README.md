@@ -63,11 +63,11 @@ Note that, through the `target_class` and `epsilon` arguments, it can be chosen 
 ## Requirements
 
 
-The repo contains a `dlts.yml` file, a conda environment that allows running both models. To import and activate it, you can do:
+The repo contains a `llchallenge.yml` file, a conda environment that allows running both models. To import and activate it, you can do:
 
 ```
-conda env create -f dlts.yml
-conda activate dlts
+conda env create -f llchallenge.yml
+conda activate llchallenge
 ```
 
 Alternatively, you can create a new conda environment with Python 3.10 (version used for testing) and install the rest of the packages (see requirements.txt):
