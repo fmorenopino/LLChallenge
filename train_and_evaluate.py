@@ -24,7 +24,7 @@ if torch.cuda.is_available():
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Train CIFAR-10 model with a validation set.")
-    parser.add_argument('--num_epochs', type=int, default=30, help='Number of training epochs.')
+    parser.add_argument('--num_epochs', type=int, default=100, help='Number of training epochs.')
     parser.add_argument('--batch_size', type=int, default=100, help='Batch size for training.')
     parser.add_argument('--print_freq', type=int, default=5, help='Frequency (in epochs) to print training info.')
     parser.add_argument('--plot_freq', type=int, default=5, help='Frequency (in epochs) to plot validation predictions.')
@@ -34,10 +34,11 @@ def parse_arguments():
                         help="Type of model to use: 'mlp' for a fully-connected network or 'cnn' for a convolutional network.")
     parser.add_argument('--data_folder', type=str, default='data',
                         help='Folder with the cifar-10-batches-py files.')
-    parser.add_argument('--epsilon', type=float, default=0.1,
+    parser.add_argument('--epsilon', type=float, default=0.5,
                         help='Total perturbation magnitude for the attack.')
-    parser.add_argument('--target_class', type=int, default=8,
-                        help='(Optional) The target class to force the model to predict for adversarial examples.')
+    # Remove default value and make target_class a required parameter.
+    parser.add_argument('--target_class', type=int, default=0,
+                        help='The target class to force the model to predict for adversarial examples.')
     parser.add_argument('--num_steps', type=int, default=10,
                         help='Number of iterations for the iterative attack.')
     return parser.parse_args()
@@ -53,7 +54,7 @@ for arg, value in sorted(vars(args).items()):
 
 # Create a unique experiment directory under "runs" using the arguments.
 # The folder name is: run_<model_type>_<epsilon>_<target_class>
-exp_folder_name = f"run_{args.model_type}_{args.epsilon}_{args.target_class}"
+exp_folder_name = f"run_{args.model_type}_eps_{args.epsilon}_target_{args.target_class}"
 exp_dir = os.path.join("runs", exp_folder_name)
 os.makedirs(exp_dir, exist_ok=True)
 
@@ -144,10 +145,10 @@ def plot_grid(images, true_labels, predictions, confidences, title, save_path):
     plt.close(fig)
 
 
-def plot_adversarial_grid(orig_images, adv_images, true_labels, adv_preds, adv_confidences, title, save_path, target_class=None):
+def plot_adversarial_grid(orig_images, adv_images, true_labels, adv_preds, adv_confidences, title, save_path, target_class):
     """
     Plot a grid comparing original CIFAR-10 images and their adversarial counterparts.
-    If a target_class is provided, the adversarial images are labelled with the target.
+    The adversarial images are labelled with the target.
     """
     n_pairs = len(orig_images)
     pairs_per_row = 5
@@ -156,10 +157,7 @@ def plot_adversarial_grid(orig_images, adv_images, true_labels, adv_preds, adv_c
         n_rows += 1
 
     fig, axes = plt.subplots(n_rows, pairs_per_row * 2, figsize=(2 * pairs_per_row, 2 * n_rows))
-    if target_class is not None:
-        fig.suptitle(f"{title}\n(Target desired: {target_class})", fontsize=16)
-    else:
-        fig.suptitle(title, fontsize=16)
+    fig.suptitle(f"{title}\n(Target desired: {target_class})", fontsize=16)
         
     for idx in range(n_pairs):
         row = idx // pairs_per_row
@@ -177,10 +175,7 @@ def plot_adversarial_grid(orig_images, adv_images, true_labels, adv_preds, adv_c
         ax_orig.set_title(f"True: {true_labels[idx]}", fontsize=8)
         ax_adv.imshow(adv_img)
         ax_adv.axis('off')
-        if target_class is not None:
-            ax_adv.set_title(f"Target: {target_class}\nP: {adv_preds[idx]}\nConf: {adv_confidences[idx]:.2f}", fontsize=8)
-        else:
-            ax_adv.set_title(f"T: {true_labels[idx]}\nP: {adv_preds[idx]}\nConf: {adv_confidences[idx]:.2f}", fontsize=8)
+        ax_adv.set_title(f"Target: {target_class}\nP: {adv_preds[idx]}\nConf: {adv_confidences[idx]:.2f}", fontsize=8)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.savefig(save_path)
     plt.close(fig)
@@ -210,16 +205,15 @@ def evaluate(model, x_data, y_data, batch_size, device):
     return avg_loss, accuracy
 
 
-def iterative_fgsm_attack(model, data, target, epsilon, device, targeted=True, num_steps=10):
+def iterative_fgsm_attack(model, data, target, epsilon, device, num_steps=10):
     """
-    Iteratively apply FGSM (or its targeted variant) to drive the model's prediction
+    Iteratively apply FGSM (targeted variant) to drive the model's prediction
     towards the target class.
     - model: the neural network.
     - data: original input image tensor.
     - target: tensor containing the desired target label.
     - epsilon: total maximum perturbation allowed.
     - num_steps: number of iterations.
-    - targeted: if True, perform a targeted attack.
     """
     alpha = epsilon / num_steps
     adv_data = data.clone().detach().to(device)
@@ -230,20 +224,17 @@ def iterative_fgsm_attack(model, data, target, epsilon, device, targeted=True, n
         loss = F.cross_entropy(output, target)
         model.zero_grad()
         loss.backward()
-        if targeted:
-            # Subtract gradient for a targeted attack.
-            adv_data = adv_data - alpha * adv_data.grad.sign()
-        else:
-            adv_data = adv_data + alpha * adv_data.grad.sign()
+        # For a targeted attack, subtract the gradient.
+        adv_data = adv_data - alpha * adv_data.grad.sign()
         adv_data = torch.clamp(adv_data, 0, 1).detach()
     
     return adv_data
 
-
-def fgsm_attack(model, data, target, epsilon, device, targeted=False):
-    """
-    Single-step FGSM attack.
-    """
+"""
+def fgsm_attack(model, data, target, epsilon, device):
+    
+    #Single-step FGSM attack (targeted variant).
+    
     data = data.clone().detach().to(device)
     data.requires_grad_()
     target = target.clone().detach().to(device)
@@ -252,13 +243,11 @@ def fgsm_attack(model, data, target, epsilon, device, targeted=False):
     model.zero_grad()
     loss.backward()
     data_grad = data.grad.data
-    if targeted:
-        perturbed_data = data - epsilon * data_grad.sign()
-    else:
-        perturbed_data = data + epsilon * data_grad.sign()
+    # For a targeted attack, subtract the perturbation.
+    perturbed_data = data - epsilon * data_grad.sign()
     perturbed_data = torch.clamp(perturbed_data, 0, 1)
     return perturbed_data
-
+"""
 
 def train_model(model, optimizer, x_train, y_train, x_val, y_val,
                 fixed_test_x, fixed_test_y, fixed_val_x, fixed_val_y, device,
@@ -363,10 +352,9 @@ def test_model(model, x_test, y_test, fixed_test_x, fixed_test_y, device, batch_
     return test_accuracy, average_test_loss
 
 
-def test_model_adversarial(model, x_test, y_test, batch_size, epsilon, device, testing_dir, target_class=None, num_steps=10):
+def test_model_adversarial(model, x_test, y_test, batch_size, epsilon, device, testing_dir, target_class, num_steps=10):
     """
-    Test the model on adversarial examples.
-    If a target_class is provided, a targeted attack is performed using an iterative method.
+    Test the model on adversarial examples using a targeted attack.
     """
     test_loss = 0.0
     total_correct = 0
@@ -376,34 +364,23 @@ def test_model_adversarial(model, x_test, y_test, batch_size, epsilon, device, t
         x_batch = torch.FloatTensor(x_test[i:i+batch_size]).to(device)
         y_batch = torch.LongTensor(y_test[i:i+batch_size]).to(device)
         
-        if target_class is not None:
-            # Create a target tensor filled with the user-specified target class.
-            target_tensor = torch.full_like(y_batch, target_class)
-            # Use the iterative targeted attack.
-            x_batch_adv = iterative_fgsm_attack(model, x_batch, target_tensor, epsilon, device, targeted=True, num_steps=num_steps)
-            loss_target = target_tensor
-        else:
-            x_batch_adv = fgsm_attack(model, x_batch, y_batch, epsilon, device, targeted=False)
-            loss_target = y_batch
+        # Create a target tensor filled with the user-specified target class.
+        target_tensor = torch.full_like(y_batch, target_class)
+        # Use the iterative targeted attack.
+        x_batch_adv = iterative_fgsm_attack(model, x_batch, target_tensor, epsilon, device, num_steps=num_steps)
+        loss_target = target_tensor
             
         outputs = model(x_batch_adv)
         loss = F.cross_entropy(outputs, loss_target)
         test_loss += loss.item() * x_batch.size(0)
         preds = outputs.data.max(1)[1]
-        
-        if target_class is not None:
-            total_correct += (preds == target_tensor).sum().item()
-        else:
-            total_correct += preds.eq(y_batch.data).sum().item()
+        total_correct += (preds == target_tensor).sum().item()
         total_samples += x_batch.size(0)
     
     average_test_loss = test_loss / total_samples
     test_accuracy = (total_correct / total_samples) * 100.0
     
-    if target_class is not None:
-        print(f"Iterative FGSM Targeted Adversarial Test Accuracy (target = {target_class}, epsilon = {epsilon}): {test_accuracy:.2f}%")
-    else:
-        print(f"FGSM Adversarial Test Accuracy (epsilon = {epsilon}): {test_accuracy:.2f}%")
+    print(f"Iterative FGSM Targeted Adversarial Test Accuracy (target = {target_class}, epsilon = {epsilon}): {test_accuracy:.2f}%")
     
     writer.add_scalar("Test/FGSM_Loss", average_test_loss)
     writer.add_scalar("Test/FGSM_Accuracy", test_accuracy)
@@ -411,18 +388,15 @@ def test_model_adversarial(model, x_test, y_test, batch_size, epsilon, device, t
     fixed_test_x_subset = x_test[:25]
     fixed_test_y_subset = y_test[:25]
     fixed_test_data = torch.FloatTensor(fixed_test_x_subset).to(device)
-    if target_class is not None:
-        target_tensor = torch.full((fixed_test_data.size(0),), target_class, dtype=torch.long).to(device)
-        fixed_test_adv = iterative_fgsm_attack(model, fixed_test_data, target_tensor, epsilon, device, targeted=True, num_steps=num_steps)
-    else:
-        fixed_test_adv = fgsm_attack(model, fixed_test_data, torch.LongTensor(fixed_test_y_subset).to(device), epsilon, device, targeted=False)
+    target_tensor = torch.full((fixed_test_data.size(0),), target_class, dtype=torch.long).to(device)
+    fixed_test_adv = iterative_fgsm_attack(model, fixed_test_data, target_tensor, epsilon, device, num_steps=num_steps)
     
     with torch.no_grad():
         adv_output = model(fixed_test_adv)
         adv_softmax = F.softmax(adv_output, dim=1)
         adv_preds = adv_output.data.max(1)[1].cpu().numpy()
         adv_confidences = adv_softmax.data.max(1)[0].cpu().numpy()
-    adv_title = f"Original vs Iterative FGSM {'Targeted' if target_class is not None else 'Untargeted'} Adversarial Examples (epsilon = {epsilon})"
+    adv_title = f"Original vs Iterative FGSM Targeted Adversarial Examples (epsilon = {epsilon})"
     adv_save_path = os.path.join(testing_dir, f"adv_test_comparison_FGSM_epsilon_{epsilon}.png")
     plot_adversarial_grid(fixed_test_x_subset, fixed_test_adv.detach().cpu().numpy(),
                           fixed_test_y_subset, adv_preds, adv_confidences, adv_title, adv_save_path,
@@ -517,14 +491,15 @@ def main(args):
     )
 
     print("Training complete. Loading the best model for testing.")
-    model.load_state_dict(torch.load(model_save_path))
+    #model.load_state_dict(torch.load(model_save_path))
+    model.load_state_dict(torch.load(model_save_path, weights_only=True))
 
     test_accuracy, test_loss = test_model(
         model, x_test, y_test, fixed_test_x, fixed_test_y, device,
         batch_size=args.batch_size, testing_dir=testing_dir
     )
     
-    print("Testing on FGSM adversarial examples...")
+    print("Testing on FGSM targeted adversarial examples...")
     adv_accuracy, adv_loss = test_model_adversarial(
         model, x_test, y_test, batch_size=args.batch_size,
         epsilon=args.epsilon, device=device, testing_dir=testing_dir,
