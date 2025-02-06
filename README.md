@@ -2,7 +2,7 @@
 
 This repository contains code for training and evaluating neural network models on the CIFAR dataset with a particular focus on adversarial robustness. The repository provides two main scripts:
 
-- **train_and_evaluate.py** – Trains a model on CIFAR data, evaluates it on both clean and adversarial examples, and saves metrics and plots.
+- **train_and_evaluate.py** – Trains a model (MLP or CNN) on CIFAR data, evaluates it on both clean and adversarial examples, and saves metrics and plots.
 - **load_model_and_evaluate.py** – Loads a pre-trained model and evaluates it on the test set, including adversarial evaluation using two different corruption techniques. The user must indicates the location of the pre-trained model.
 
 Note that this repo trains its own models and does not use pre-trained models from torchvision. However, the attack could be performed on any pre-trained model as long as its gradient can be accessed.
@@ -11,7 +11,7 @@ Note that this repo trains its own models and does not use pre-trained models fr
 
 ## Overview
 
-The code in this repository is designed to demonstrate how input images can be corrupted using an extremely simple adversarial technique: FGSM (Fast Gradient Sign Method).  This method perturbs images by taking a step in the (desired) direction of the gradient of the loss with respect to the input. The magnitude of the perturbation is controlled by a parameter (epsilon). For more details, see: https://arxiv.org/pdf/1412.6572.
+The code in this repository is designed to demonstrate how input images can be corrupted using a simple adversarial technique: FGSM (Fast Gradient Sign Method).  This method perturbs images by taking a step in the (desired) direction of the gradient of the loss with respect to the input. The magnitude of the perturbation is controlled by a parameter (epsilon). For more details, see: https://arxiv.org/pdf/1412.6572.
 
 ---
 
@@ -40,7 +40,7 @@ This script is responsible for both training and testing a model on CIFAR data. 
 
 ### load_model_and_evaluate.py
 
-This evaluation script is designed to test a previously trained model. To specify the folder from which to load the pre-trained model, use the load_model argument. Its main functionalities are:
+This evaluation script is designed to test a previously trained model. To specify the folder from which to load the pre-trained model, use the `load_model` argument. Its main functionalities are:
 
 - **Model Loading:**  
   Loads the best saved model from a specified experiment folder. The model can be either an MLP or a CNN.
@@ -54,6 +54,8 @@ This evaluation script is designed to test a previously trained model. To specif
 - **Adversarial Testing:**  
   Evaluates the model using a FGSM Attack. A grid plot is produced that compares original images with their adversarial versions, along with the model’s predictions and confidence scores.
 
+
+Note that, through the `target_class` and `epsilon` arguments, it can be chosen the desired target class and the epsilon (see referenced paper before) of the attack.
 ---
 
 ## Requirements

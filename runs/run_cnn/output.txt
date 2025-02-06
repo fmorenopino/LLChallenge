@@ -1,0 +1,9 @@
+Using CNN model.
+Loading model from runs/run_cnn_eps_0.05_target_0/best_model.pth
+Model loaded.
+Clean Test Accuracy: 2.58%
+Testing on FGSM targeted adversarial examples...
+Clean Test Accuracy: 70.77%
+Adversarial Test Accuracy (target 0): 35.56%
+Iterative FGSM Targeted Adversarial Test Accuracy (target = 0, epsilon = 0.01): 70.77%
+

@@ -30,14 +30,14 @@ def parse_arguments():
                         help="Type of model to use: 'mlp' for a fully-connected network or 'cnn' for a convolutional network.")
     parser.add_argument('--data_folder', type=str, default='data',
                         help='Folder with the cifar-10-batches-py files.')
-    parser.add_argument('--epsilon', type=float, default=0.1,
+    parser.add_argument('--epsilon', type=float, default=0.05,
                         help='Total perturbation magnitude for the attack.')
-    parser.add_argument('--target_class', type=int, default=7,
+    parser.add_argument('--target_class', type=int, default=0,
                         help='The target class to force the model to predict for adversarial examples.')
     parser.add_argument('--num_steps', type=int, default=10,
                         help='Number of iterations for the iterative attack.')
     # New argument to specify the path to the pre-trained model.
-    parser.add_argument('--load_model', type=str, default='runs/run_mlp_eps_0.5_target_0',
+    parser.add_argument('--load_model', type=str, default='runs/run_mlp',
                         help='Path to the pre-trained model weights file or directory containing best_model.pth.')
     return parser.parse_args()
 
@@ -137,8 +137,7 @@ def plot_grid(images, true_labels, predictions, confidences, title, save_path):
     plt.savefig(save_path)
     plt.close(fig)
 
-
-def plot_adversarial_grid(orig_images, adv_images, true_labels, adv_preds, adv_confidences, title, save_path, target_class):
+def plot_adversarial_grid(orig_images, adv_images, true_labels, adv_preds, adv_confidences, title, save_path, target_class, acc_clean, acc_adv):
     """
     Plot a grid comparing original CIFAR-10 images and their adversarial counterparts.
     The adversarial images are labelled with the target.
@@ -150,7 +149,7 @@ def plot_adversarial_grid(orig_images, adv_images, true_labels, adv_preds, adv_c
         n_rows += 1
 
     fig, axes = plt.subplots(n_rows, pairs_per_row * 2, figsize=(2 * pairs_per_row, 2 * n_rows))
-    fig.suptitle(f"{title}\n(Target desired: {target_class})", fontsize=16)
+    fig.suptitle(f"{title}\n(Target desired: {target_class})\nAccuracy (clean): {acc_clean:.2f}%  |  Accuracy (adv): {acc_adv:.2f}%", fontsize=12)
         
     for idx in range(n_pairs):
         row = idx // pairs_per_row
@@ -169,7 +168,7 @@ def plot_adversarial_grid(orig_images, adv_images, true_labels, adv_preds, adv_c
         ax_adv.imshow(adv_img)
         ax_adv.axis('off')
         ax_adv.set_title(f"Target: {target_class}\nP: {adv_preds[idx]}\nConf: {adv_confidences[idx]:.2f}", fontsize=8)
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
     plt.savefig(save_path)
     plt.close(fig)
 
@@ -254,36 +253,39 @@ def preprocess_cifar_images(x):
     x = x / 255.0
     return x.astype(np.float32)
 
-
-def test_model_adversarial(model, x_test, y_test, batch_size, epsilon, device, attack_dir, target_class, num_steps=10):
+def test_model_adversarial(model, x_test, y_test, batch_size, epsilon, device, testing_dir, target_class, num_steps=10):
     """
     Test the model on adversarial examples using a targeted attack.
     """
-    test_loss = 0.0
-    total_correct = 0
-    total_samples = 0
     model.eval()
+    total_correct_clean = 0
+    total_correct_adv = 0
+    total_samples = 0
+    
     for i in tqdm(range(0, len(y_test), batch_size), desc="Adversarial Testing (FGSM)"):
         x_batch = torch.FloatTensor(x_test[i:i+batch_size]).to(device)
         y_batch = torch.LongTensor(y_test[i:i+batch_size]).to(device)
         
+        outputs_clean = model(x_batch)
+        preds_clean = outputs_clean.data.max(1)[1]
+        total_correct_clean += preds_clean.eq(y_batch.data).sum().item()
+        
         target_tensor = torch.full_like(y_batch, target_class)
         x_batch_adv = iterative_fgsm_attack(model, x_batch, target_tensor, epsilon, device, num_steps=num_steps)
-            
-        outputs = model(x_batch_adv)
-        loss = F.cross_entropy(outputs, target_tensor)
-        test_loss += loss.item() * x_batch.size(0)
-        preds = outputs.data.max(1)[1]
-        total_correct += (preds == target_tensor).sum().item()
+        
+        outputs_adv = model(x_batch_adv)
+        preds_adv = outputs_adv.data.max(1)[1]
+        total_correct_adv += (preds_adv == target_tensor).sum().item()
+        
         total_samples += x_batch.size(0)
     
-    average_test_loss = test_loss / total_samples
-    test_accuracy = (total_correct / total_samples) * 100.0
+    acc_clean = (total_correct_clean / total_samples) * 100.0
+    acc_adv = (total_correct_adv / total_samples) * 100.0
+    print(f"Clean Test Accuracy: {acc_clean:.2f}%")
+    print(f"Adversarial Test Accuracy (target {target_class}): {acc_adv:.2f}%")
     
-    print(f"Iterative FGSM Targeted Adversarial Test Accuracy (target = {target_class}, epsilon = {epsilon}): {test_accuracy:.2f}%")
-    
-    writer.add_scalar("Test/FGSM_Loss", average_test_loss)
-    writer.add_scalar("Test/FGSM_Accuracy", test_accuracy)
+    writer.add_scalar("Test/FGSM_Accuracy_Clean", acc_clean)
+    writer.add_scalar("Test/FGSM_Accuracy_Adv", acc_adv)
     
     fixed_test_x_subset = x_test[:25]
     fixed_test_y_subset = y_test[:25]
@@ -296,13 +298,14 @@ def test_model_adversarial(model, x_test, y_test, batch_size, epsilon, device, a
         adv_softmax = F.softmax(adv_output, dim=1)
         adv_preds = adv_output.data.max(1)[1].cpu().numpy()
         adv_confidences = adv_softmax.data.max(1)[0].cpu().numpy()
+    
     adv_title = f"Original vs Iterative FGSM Targeted Adversarial Examples (epsilon = {epsilon})"
-    adv_save_path = os.path.join(attack_dir, f"adv_test_comparison_FGSM_epsilon_{epsilon}.png")
+    adv_save_path = os.path.join(testing_dir, f"adv_test_comparison_FGSM_eps_{epsilon}_target_{target_class}.png")
     plot_adversarial_grid(fixed_test_x_subset, fixed_test_adv.detach().cpu().numpy(),
                           fixed_test_y_subset, adv_preds, adv_confidences, adv_title, adv_save_path,
-                          target_class=target_class)
+                          target_class=target_class, acc_clean=acc_clean, acc_adv=acc_adv)
     
-    return test_accuracy, average_test_loss
+    return acc_clean, acc_adv
 
 
 def main(args):
@@ -345,7 +348,7 @@ def main(args):
     print("Testing on FGSM targeted adversarial examples...")
     adv_accuracy, adv_loss = test_model_adversarial(
         model, x_test, y_test, batch_size=args.batch_size,
-        epsilon=args.epsilon, device=device, attack_dir=attack_evaluation_dir,
+        epsilon=args.epsilon, device=device, testing_dir=attack_evaluation_dir,
         target_class=args.target_class, num_steps=args.num_steps
     )
     print(f"Iterative FGSM Targeted Adversarial Test Accuracy (target = {args.target_class}, epsilon = {args.epsilon}): {adv_accuracy:.2f}%")
