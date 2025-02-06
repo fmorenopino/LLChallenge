@@ -4,5 +4,5 @@ Model loaded.
 Clean Test Accuracy: 1.54%
 Testing on FGSM targeted adversarial examples...
 Clean Test Accuracy: 45.33%
-Adversarial Test Accuracy (target 5): 51.55%
-Iterative FGSM Targeted Adversarial Test Accuracy (target = 5, epsilon = 0.05): 45.33%
+Adversarial Test Accuracy (target 4): 46.59%
+Iterative FGSM Targeted Adversarial Test Accuracy (target = 4, epsilon = 0.05): 45.33%

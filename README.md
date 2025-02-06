@@ -4,8 +4,9 @@ This repository contains code for training and evaluating neural network models 
 
 - **train_and_evaluate.py** – Trains a model (MLP or CNN) on CIFAR data, evaluates it on both clean and adversarial examples, and saves metrics and plots.
 - **load_model_and_evaluate.py** – Loads a pre-trained model and evaluates it on the test set, including adversarial evaluation using two different corruption techniques. The user must indicates the location of the pre-trained model.
+- **utils.py** contains some of the common functions to the previous scripts.
 
-Note that this repo trains its own models and does not use pre-trained models from torchvision. However, the attack could be performed on any pre-trained model as long as its gradient can be accessed.
+Note that this repo trains its own models and does not use pre-trained models from torchvision. However, the attack could be performed on any pre-trained model as long as its gradient can be accessed. Further, the folder `runs` contains two set of models parameters (MLP and CNN) that have been pre-trained in the CIFAR dataset. The `load_model_and_evaluate.py` can be used to evaluate them.
 
 ---
 
